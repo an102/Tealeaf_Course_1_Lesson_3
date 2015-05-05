@@ -1,0 +1,8 @@
+<h4><%= session[:player_name] %>, please place your bet</h4>
+</br>
+<form action="/bet_placed" method="post">
+  Maximum bet is <%= player_cash %>
+  </br>
+  <input type="text" name="current_bet">
+  <input type="submit" class="btn">
+</form>
