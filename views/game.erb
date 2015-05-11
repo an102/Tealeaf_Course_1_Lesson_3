@@ -1,11 +1,77 @@
-<h4>Hi <%= session[:player_name] %>!</h4>
+<% if @show_player_turn_template %>
+  <h4>OK, <%= session[:player_name] %>...</h4>
+<% elsif @show_dealer_card_button %>
+  <h4>And the dealer's hand is...</h4>
+<% else %>
+  <h4>End of round!</h4>
+<% end %>
 
-Your cards are:
-<ul>
-  <% session[:player_cards].each do |card| %>
-    <li><%= card.to_s %></li>
-  <% end %>
-</ul>
-Your total is <%= calculate_total(session[:player_cards]) %>.
+<div class="well">
+  <h5>Dealer's cards are:</h5>
+  <div class="background">
+    <% session[:dealer_hand].each do |card| %>
+      <div class="card">
+        <%= card_display(card[0]) %>
+      </div>
+    <% end %>
+    <% if @show_facedown_dealer_card %>
+      <div class="card">
+        <%= "<img src='/images/cards/cover.jpg'/>" %>
+      </div>
+    <% end %>
+  </div>
+  <h5>Score: <%= session[:dealer_score] %></h5>
+</div>
+
 </br>
-Your current bet is <%= session[:current_bet] %> with <%= player_cash %> remaining.
+
+<div class="well">
+  <h5>Your cards are:</h5>
+  <div class="background">
+    <% session[:player_hand].each do |card| %>
+      <div class="card">
+        <%= card_display(card[0]) %>
+      </div>
+    <% end %>
+  </div>
+  <h5>Score: <%= session[:player_score] %></h5>
+</div>
+</br>
+
+<% if @show_player_turn_template %>
+  <p>Your current bet is <strong>$<%= session[:current_bet] %></strong>.</p>
+  <p>You have <strong>$<%= session[:player_cash] - session[:current_bet].to_i %></strong> remaining.</p>
+<% else %>
+  <p>You have <strong>$<%= session[:player_cash] %></strong> remaining.</p>
+<% end %>
+
+<% if @show_player_turn_template %>
+  </br>
+  <h4>Your move!</h4>
+  <table>
+    <tr>
+      <td style="padding-right: 5px">
+        <form action="/game/player_move" method="post">
+          <input type="submit" class="btn btn-success" value="Hit"/>
+        </form>
+      </td>
+      <td>
+        <form action="/game/dealer_move" method="post">
+          <input type="submit" class="btn btn-warning" value="Stay"/>
+        </form>
+      </td>
+    </tr>
+  </table>
+<% elsif @show_dealer_card_button %>
+  </br>
+  </br>
+  <form action="/game/dealer_move" method="post">
+    <input type="submit" class="btn btn-info" value="See next dealer card"/>
+  </form>
+<% else %>
+  </br>
+  </br>
+  <form action="/game/new_round" method="post">
+    <input type="submit" class="btn btn-primary" value="Go to next round"/>
+  </form>
+<% end %>
