@@ -38,12 +38,12 @@
 </div>
 </br>
 
-<% if @show_player_turn_template %>
+<% if @show_player_turn_template || @show_dealer_card_button %>
   <p>Your current bet is <strong>$<%= session[:current_bet] %></strong>.</p>
-  <p>You have <strong>$<%= session[:player_cash] - session[:current_bet].to_i %></strong> remaining.</p>
-<% else %>
-  <p>You have <strong>$<%= session[:player_cash] %></strong> remaining.</p>
+<% elsif @display_winnings %>
+  <p>You won <strong>$<%= display_winnings %></strong>!</p>
 <% end %>
+  <p>You have <strong>$<%= session[:player_cash] %></strong> remaining.</p>
 
 <% if @show_player_turn_template %>
   </br>

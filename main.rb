@@ -1,9 +1,10 @@
 # main.rb
 # Sinatra Blackjack
 
+require 'rubygems'
 require 'sinatra'
-require "sinatra/reloader" if development?
-require 'pry'
+#require "sinatra/reloader" if development?
+#require 'pry'
 
 use Rack::Session::Cookie, :key => 'rack.session',
                            :path => '/',
@@ -15,12 +16,6 @@ def deal(hand, deck)
   deck.delete(dealt_card)
 end
 
-def dealer_deals_to_self(hand, deck)
-  begin
-    deal(session[:dealer_hand], session[:deck])
-  end while calculate_total("dealer", session[:dealer_hand]) < 17
-end
-
 def blackjack?(participant, hand)
   calculate_total(participant, hand) == 21 && hand.keys.size == 2
 end
@@ -28,7 +23,6 @@ end
 def bust?(participant, hand)
   calculate_total(participant, hand) > 21
 end
-
 
 def calculate_total(participant, hand)
   total = 0
@@ -44,14 +38,43 @@ def calculate_total(participant, hand)
   end
 end
 
-def player_wins_cash
-  session[:player_cash] += session[:current_bet].to_i
-end
-
-def player_loses_cash
+def player_places_bet
   session[:player_cash] -= session[:current_bet].to_i
 end
 
+def player_wins_cash
+  @display_winnings = true
+  session[:player_cash] += (session[:current_bet].to_i * 2)
+end
+
+def player_wins_cash_on_blackjack
+  @display_winnings = true
+  session[:player_cash] += (session[:current_bet].to_i * 2.5).truncate
+end
+
+def push
+  session[:player_cash] += session[:current_bet].to_i
+end
+
+def dealer_wins
+  session[:dealer_score] > session[:player_score]
+end
+
+def create_deck
+  session[:deck] = {}
+  ['S', 'H', 'D', 'C'].each do |symbol|
+    (2..10).each do |value|
+      card_type = symbol + value.to_s
+      session[:deck][card_type] = value
+    end
+    ['J', 'Q', 'K'].each do |letter|
+      card_type = symbol + letter
+      session[:deck][card_type] = 10
+    end
+    session[:deck][symbol + 'A'] = 11
+  end
+end
+  
 helpers do
   def card_display(card)
     if card[1] == '1'
@@ -65,16 +88,22 @@ helpers do
               when 'K' then 'king'
               when 'A' then 'ace'
       end 
-    end
-      
+    end     
     suit = case card[0]
-           when '♠' then 'spades'
-           when '♥' then 'hearts'
-           when '♦' then 'diamonds'
-           when '♣' then 'clubs'
-    end
-      
+           when 'S' then 'spades'
+           when 'H' then 'hearts'
+           when 'D' then 'diamonds'
+           when 'C' then 'clubs'
+    end     
     "<img src='/images/cards/#{suit}_#{value}.jpg'/>"
+  end
+  
+  def display_winnings
+    if blackjack?("player", session[:player_hand])
+      (session[:current_bet].to_i * 1.5).truncate
+    else
+      session[:current_bet]
+    end
   end
 end
 
@@ -82,10 +111,13 @@ before do
   @show_player_turn_template = true
   @show_facedown_dealer_card = true
   @show_dealer_card_button = false
+  @display_winnings = false
 end
 
 get '/' do
-  session[:current_bet] = 0
+  session.clear
+  session[:player_hand] = {}
+  session[:dealer_hand] = {}
   session[:player_cash] = 500
   erb :set_name
 end
@@ -96,11 +128,12 @@ post '/name_set' do
     halt erb(:set_name)
   end
   session[:player_name] = params[:player_name]
+  create_deck
   redirect '/game/bet'
 end
 
 post '/game/new_round' do
-  redirect '/game/bet' unless session[:player_cash] <= 0
+  redirect '/game/bet' unless session[:player_cash] < 10
   erb :game_over
 end
 
@@ -109,28 +142,16 @@ get '/game/bet' do
 end
 
 post '/game/bet_placed' do
-  if /\D+/.match(params[:current_bet]) || params[:current_bet].to_i > session[:player_cash] ||
-     params[:current_bet].empty? || params[:current_bet][0] == "0"
+  if /\D+/.match(params[:current_bet]) || params[:current_bet].to_i < 10 ||
+     params[:current_bet].empty? || params[:current_bet].to_i > session[:player_cash].to_i ||
+     params[:current_bet][0] == "0"
     @error = 'Hey! No funny stuff! Money on the table or SCRAM!'
     halt erb(:bet)
   end
   session[:current_bet] = params[:current_bet]
-  redirect '/game'
-end
-
-get '/game' do
-  session[:deck] = {}
-  ['♠', '♥', '♦', '♣'].each do |symbol|
-    (2..10).each do |value|
-      card_type = symbol + value.to_s
-      session[:deck][card_type] = value
-    end
-    ['J', 'Q', 'K'].each do |letter|
-      card_type = symbol + letter
-      session[:deck][card_type] = 10
-    end
-    session[:deck][symbol + 'A'] = 11
-  end
+  player_places_bet
+  session[:deck].merge!(session[:player_hand])
+  session[:deck].merge!(session[:dealer_hand])
   session[:player_hand] = {}
   session[:dealer_hand] = {}
   deal(session[:player_hand], session[:deck])
@@ -138,7 +159,11 @@ get '/game' do
   deal(session[:player_hand], session[:deck])
   calculate_total("dealer", session[:dealer_hand])
   calculate_total("player", session[:player_hand])
-  if calculate_total("player", session[:player_hand]) == 21
+  redirect '/game'
+end
+
+get '/game' do
+  if session[:player_score] == 21
     @show_player_turn_template = false 
     @show_dealer_card_button = true
   end
@@ -154,7 +179,6 @@ post '/game/player_move' do
   elsif bust?("player", session[:player_hand])
     @error = "You've gone bust! Dealer wins!"
     @show_player_turn_template = false
-    player_loses_cash
     erb :game
   else
     erb :game
@@ -163,7 +187,7 @@ end
 
 post '/game/dealer_move' do
   deal(session[:dealer_hand], session[:deck])
-  if calculate_total("dealer", session[:dealer_hand]) < 17
+  if calculate_total("dealer", session[:dealer_hand]) < 17 && !dealer_wins
     @show_player_turn_template = false
     @show_dealer_card_button = true
     @show_facedown_dealer_card = false
@@ -174,25 +198,22 @@ post '/game/dealer_move' do
 end
 
 get '/game/end_of_round' do
-  #dealer_deals_to_self(session[:dealer_hand], session[:deck])
   if blackjack?("player", session[:player_hand]) && blackjack?("dealer", session[:dealer_hand])
     @success = "Double blackjack!\n\nPush!"
-    player_wins_cash
+    push
   elsif blackjack?("player", session[:player_hand])
     @success = "Blackjack!\n\n#{session[:player_name]} wins!"
-    player_wins_cash
+    player_wins_cash_on_blackjack
   elsif bust?("dealer", session[:dealer_hand])
     @success = "Dealer bust!\n\n#{session[:player_name]} wins!"
     player_wins_cash
   elsif blackjack?("dealer", session[:dealer_hand])
     @error = "Dealer blackjack!\n\nDealer wins!"
-    player_loses_cash
   elsif session[:dealer_score] == session[:player_score]
     @success = 'Push!'
-    player_wins_cash
-  elsif session[:dealer_score] > session[:player_score]
+    push
+  elsif dealer_wins
     @error = "Dealer wins!"
-    player_loses_cash
   else
     @success = "#{session[:player_name]} wins!"
     player_wins_cash
