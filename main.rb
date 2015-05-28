@@ -3,7 +3,7 @@
 
 require 'rubygems'
 require 'sinatra'
-#require "sinatra/reloader" if development?
+require "sinatra/reloader" if development?
 #require 'pry'
 
 use Rack::Session::Cookie, :key => 'rack.session',
@@ -175,14 +175,11 @@ post '/game/player_move' do
   if calculate_total("player", session[:player_hand]) == 21
     @show_player_turn_template = false
     @show_dealer_card_button = true
-    erb :game
   elsif bust?("player", session[:player_hand])
     @error = "You've gone bust! Dealer wins!"
     @show_player_turn_template = false
-    erb :game
-  else
-    erb :game
   end
+  erb :game, layout: false
 end
 
 post '/game/dealer_move' do
@@ -191,10 +188,10 @@ post '/game/dealer_move' do
     @show_player_turn_template = false
     @show_dealer_card_button = true
     @show_facedown_dealer_card = false
-    erb :game
   else
     redirect '/game/end_of_round'
   end
+  erb :game, layout: false
 end
 
 get '/game/end_of_round' do
@@ -220,5 +217,5 @@ get '/game/end_of_round' do
   end
   @show_player_turn_template = false
   @show_facedown_dealer_card = false
-  erb :game
+  erb :game, layout: false
 end
