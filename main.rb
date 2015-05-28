@@ -3,7 +3,7 @@
 
 require 'rubygems'
 require 'sinatra'
-require "sinatra/reloader" if development?
+#require "sinatra/reloader" if development?
 #require 'pry'
 
 use Rack::Session::Cookie, :key => 'rack.session',
